@@ -1,6 +1,6 @@
 #! venv/bin/python
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import json
 
 app = Flask(__name__)
@@ -11,6 +11,7 @@ def webhook():
     req = request.get_json(silent=True, force=True)
     print("Request:")
     print(json.dumps(req, indent=4))
+    return jsonify(req)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000, host='0.0.0.0')
