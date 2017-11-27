@@ -61,15 +61,19 @@ def webhook():
         return jsonify({"status": "failed"})
 
     # Dispatching based on parsed intent
+    log.info("Extracting parameters and event informations")
+    parameters = req['queryResult']['parameters']
+    event = req['originalDetectIntentRequest']['payload']['data']['event']
     log.info("Dispatching based on intent")
     if intent == "incident.create":
-        parameters = req['queryResult']['parameters']
         incidents.create_incident(
             priority=parameters['priority'],
             title=parameters['title'],
             description=parameters['description'])
     if intent == "incident.close":
-        incidents.close_incident(req['originalDetectIntentRequest']['payload']['data']['event'])
+        incidents.close_incident(event)
+    if intent == "incident.list_updates":
+        incidents.list_incident_updates(event)
     else:
         log.warning("Couldn't dispatch intent {intent} to anything "
                     "known".format(intent=intent))

@@ -26,6 +26,11 @@ class IncidentsManager(object):
         log.info("Source: " + str(source))
         log.info("Closed incident successfully :)")
 
+    def list_incident_updates(self, event):
+        log.info("Listing incident updates...")
+        source = self.extract_event_infos(event)
+        log.info("Source: " + str(source))
+
     def extract_event_infos(self, event):
         """
         Extract Slack event core infos (channel, user, message) from event
