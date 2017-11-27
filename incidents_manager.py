@@ -1,4 +1,5 @@
 from log import log
+from slacker import Slacker, Error
 
 from config import config
 
@@ -12,17 +13,26 @@ class IncidentsManager(object):
     def __init__(self):
         log.info("Initializing incidents manager ...")
         # Slack
-        # SMTP configuration
+        self.slack_channel = config['slack']['channel']
+        self.slack = Slacker(config['slack']['self']['token'])
+        self.slack_self_user = config['slack']['self']
+        self.slack_fake_user = Slacker(config['slack']['fake_user']['token'])
+        self.apiai_user = self.slack_fake_user.users.info(
+            user=config['slack']['apiai_user']['id']).body['user']
+        # SMTP
         # Elasticsearch
         log.info("- Configuring Elasticsearch connection ...")
         self.es_index = config['elasticsearch']['index']
         try:
+            # @formatter:off
+            # noinspection PyPep8
             aws_auth = AWSRequestsAuth(
                 aws_host    = config['elasticsearch']['host'],
                 aws_region  = config['elasticsearch']['region'],
                 aws_service = 'es',
                 **boto_utils.get_credentials()
             )
+            # noinspection PyPep8
             self.es = Elasticsearch(
                 hosts   = [{'host': config['elasticsearch']['host'], 'port': 443}],
                 http_auth           = aws_auth,
@@ -30,6 +40,7 @@ class IncidentsManager(object):
                 verify_certs        = True,
                 connection_class    = RequestsHttpConnection
             )
+            # @formatter:on
         except:
             log.error("Couldn't connect to Elasticsearch")
         try:
@@ -82,7 +93,7 @@ class IncidentsManager(object):
 
     def create_es_index(self, es_index):
         # === Wipe index
-        #self.es.indices.delete(index=self.es_index)
+        # self.es.indices.delete(index=self.es_index)
         # === Create it again
         print("Creating index " + es_index + " ...")
         index_creation = self.es.indices.create(index=es_index, ignore=400)
