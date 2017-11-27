@@ -1,6 +1,6 @@
 #! venv/bin/python
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 import json
 import traceback
 
@@ -10,6 +10,7 @@ from incidents_manager import IncidentsManager
 app = Flask(__name__)
 
 incidents = IncidentsManager()
+
 
 # Error Handlers
 
@@ -27,6 +28,7 @@ def bad_request(error):
 @app.errorhandler(422)
 def unprocessable_entity(error):
     return make_response(jsonify({'error': str(error)}), 422)
+
 
 # Handlers
 
@@ -59,8 +61,15 @@ def webhook():
         return jsonify({"status": "failed"})
 
     # Dispatching based on parsed intent
+    log.info("Dispatching based on intent")
     if intent == "incident.create":
-        incidents.create_incident(req['queryResult']['parameters'])
+        parameters = req['queryResult']['parameters']
+        incidents.create_incident(
+            priority=parameters['priority'],
+            title=parameters['title'],
+            description=parameters['description'])
+    if intent == "incident.close":
+        incidents.close_incident(req['originalDetectIntentRequest']['payload']['data']['event'])
     else:
         log.warning("Couldn't dispatch intent {intent} to anything "
                     "known".format(intent=intent))
