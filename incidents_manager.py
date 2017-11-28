@@ -1,8 +1,5 @@
-from log import log
-from slacker import Slacker, Error
-
-from config import config
-
+# Slack
+from slacker import Slacker
 # JIRA
 from jira import JIRA
 # ElasticSearch
@@ -10,6 +7,9 @@ from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.aws_auth import AWSRequestsAuth
 from aws_requests_auth import boto_utils
 
+from log import log
+from config import config
+from incident import Incident, IncidentPriority
 
 class IncidentsManager(object):
     def __init__(self):
@@ -27,14 +27,12 @@ class IncidentsManager(object):
         self.es_index = config['elasticsearch']['index']
         try:
             # @formatter:off
-            # noinspection PyPep8
             aws_auth = AWSRequestsAuth(
                 aws_host    = config['elasticsearch']['host'],
                 aws_region  = config['elasticsearch']['region'],
                 aws_service = 'es',
                 **boto_utils.get_credentials()
             )
-            # noinspection PyPep8
             self.es = Elasticsearch(
                 hosts   = [{'host': config['elasticsearch']['host'], 'port': 443}],
                 http_auth           = aws_auth,
@@ -51,7 +49,7 @@ class IncidentsManager(object):
             log.error("Couldn't create Elasticsearch index")
         # Jira
         log.info("- Configuring Jira connection ...")
-        self.jira   = JIRA(
+        self.jira = JIRA(
             {'server': config['jira']['host']},
             basic_auth=(config['jira']['user'], config['jira']['password'])
         )
@@ -61,20 +59,27 @@ class IncidentsManager(object):
 
     def create_incident(self, priority, title, description):
         log.info(
-            "Creating incident ...:\n"
+            "Starting to create incident ...:\n"
             "  Priority: {priority}\n"
             "  Title: {title}\n"
             "  Description: {description}"
             "".format(priority=priority, title=title,
                       description=description))
+        # @formatter:off
         jira_issue = self.jira.create_issue(
-            project = self.jira_project,
-            issuetype={'name': 'Task'},
-            summary  = title,
+            project     = self.jira_project,
+            issuetype   = {'name': 'Task'},
+            summary     = title,
             description = description)
+        # @formatter:on
         incident_id = int(str(jira_issue)[len(self.jira_project)+1:])
         log.debug("got incident id " + str(incident_id))
-        # TODO create Incident object
+        incident = Incident(
+            incident_id,
+            priority    = IncidentPriority(priority),
+            title       = title,
+            description = description)
+        log.debug(incident.serialize())
         # TODO create Slack channel
         # TODO send incident to ES
         # TODO post incident to Slack main channel

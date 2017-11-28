@@ -1,0 +1,143 @@
+from enum import Enum
+import json
+from datetime import datetime
+
+from config import config
+from log import log
+
+DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+
+class DumbEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.strftime('%Y-%m-%dT%H:%M:%S%z')
+        if isinstance(o, IncidentState) or isinstance(o, IncidentPriority):
+            return o.value
+        return o.__str__()
+
+
+class IncidentState(Enum):
+    ONGOING = "Ongoing"
+    CLOSED  = "Closed"
+
+
+class IncidentPriority(Enum):
+    ORANGE  = "orange"
+    RED     = "red"
+
+
+class Incident(object):
+    def __init__(self, incident_id=0, priority=IncidentPriority.RED,
+                 title="Undefined", description="Undefined"):
+        print("Creating incident " + str(incident_id) + " ...")
+        self.state          = IncidentState.ONGOING
+        self.id             = incident_id
+        self.title          = title
+        self.description    = description
+        self.priority       = priority
+        self.slack_channel  = "incident-" + str(self.id)
+        self.slack_channel_id  = None
+        self.opening_time   = datetime.now()
+        self.closing_time   = None
+        self.starting_time  = datetime.now()  # TODO : Make this set-able
+        self.ending_time    = None
+        self.updates        = []
+        self.jira_issue     = config['jira']['project'] + "-" + str(self.id)
+        self.cachet_id      = None
+        if incident_id != 0:
+            log.debug("Sending incident to ES...")
+            self.send_to_es()
+        print("... created incident")
+
+    def close(self):
+        from app import incidents
+        print("Closing incident " + str(self.id) + " ... ")
+        self.state          = IncidentState.CLOSED
+        self.closing_time   = datetime.now()
+        self.ending_time    = self.closing_time
+        log.debug("... updated ES record")
+        self.send_to_es()
+        log.debug("... updated ES record")
+        log.debug("... sending confirmation to Slack")
+        mgr.slack.chat.post_message(
+            channel = self.slack_channel,
+            text    = '',
+            as_user = True,
+            attachments = [
+                {
+                    "text": "Closing this incident, good job :+1:",
+                    "color": "good",
+                    "mrkdwn_in": ["text"],
+                    "short": False,
+                    "fields": [
+                        {
+                            "title": "Jira Issue",
+                            "value": "<{jira_server}/browse/{jira_issue}"
+                                     "|{jira_issue}>".format(
+                                        jira_server=config['jira']['host'],
+                                        jira_issue=self.jira_issue),
+                            "short": True
+                        },
+                        {
+                            "title": "State",
+                            "value": self.state.value,
+                            "short": True
+                        }
+                    ]
+                }
+            ]
+        )
+        print("... sent confirmation")
+        # TODO self.list_updates()
+        print("... updating Jira issue")
+        try:
+            mgr.jira.transition_issue(self.jira_issue, "21")
+        except JIRAError:
+            pass
+        print("... updated issue")
+        print("... updating Cachet")
+        self.declare_to_cachet()
+        print("... updated Cachet")
+
+    def get_color(self):
+        """Get color code from incident priority"""
+        if self.priority == IncidentPriority.ORANGE:
+            return "#ffa500"
+        elif self.priority == IncidentPriority.RED:
+            return "#ff2600"
+
+    def send_to_es(self):
+        """Send incident to ElasticSearch"""
+        from __main__ import incidents
+        print("Sending incident to ES ...")
+        incidents.es.index(
+            index = incidents.es_index,
+            doc_type="incident",
+            id = self.id,
+            body = self.serialize()
+        )
+        print("... sent incident to ES")
+        print("Refreshing ES index ...")
+        incidents.es.indices.refresh(index=incidents.es_index)
+        print("... refreshed index")
+
+    def serialize(self):
+        return json.dumps(self.__dict__, indent=4, cls=DumbEncoder, ensure_ascii=False)
+
+    def unserialize(self, source_json):
+        log.debug("Unserializing incident from json ...")
+        log.debug(source_json)
+        self.__dict__ = source_json
+        self.opening_time = datetime.strptime(self.opening_time, DATE_FORMAT)
+        self.starting_time = datetime.strptime(self.starting_time, DATE_FORMAT)
+        self.priority = IncidentPriority(self.priority)
+        self.state = IncidentState(self.state)
+        if self.state == IncidentState.CLOSED:
+            self.closing_time = datetime.strptime(self.closing_time, DATE_FORMAT)
+        for idx, update in enumerate(self.updates):
+            self.updates[idx]['date'] = datetime.strptime(update['date'], DATE_FORMAT)
+        # print(self.serialize())
+        print("... unserialized")
+        return self
+
