@@ -1,6 +1,7 @@
 from enum import Enum
 import json
 from datetime import datetime
+from jira.exceptions import JIRAError
 
 from config import config
 from log import log
@@ -60,7 +61,7 @@ class Incident(object):
         self.send_to_es()
         log.debug("... updated ES record")
         log.debug("... sending confirmation to Slack")
-        mgr.slack.chat.post_message(
+        incidents.slack.chat.post_message(
             channel = self.slack_channel,
             text    = '',
             as_user = True,
@@ -88,17 +89,18 @@ class Incident(object):
                 }
             ]
         )
-        print("... sent confirmation")
+        log.debug("... sent confirmation")
         # TODO self.list_updates()
-        print("... updating Jira issue")
+        log.debug("... updating Jira issue")
         try:
-            mgr.jira.transition_issue(self.jira_issue, "21")
+            # TODO update to proper transition ID
+            incidents.jira.transition_issue(self.jira_issue, "21")
         except JIRAError:
             pass
-        print("... updated issue")
-        print("... updating Cachet")
-        self.declare_to_cachet()
-        print("... updated Cachet")
+        log.debug("... updated issue")
+        log.debug("... updating Cachet")
+        # TODO self.declare_to_cachet()
+        log.debug("... updated Cachet")
 
     def get_color(self):
         """Get color code from incident priority"""
@@ -109,7 +111,7 @@ class Incident(object):
 
     def send_to_es(self):
         """Send incident to ElasticSearch"""
-        from __main__ import incidents
+        from app import incidents
         print("Sending incident to ES ...")
         incidents.es.index(
             index = incidents.es_index,
@@ -122,8 +124,23 @@ class Incident(object):
         incidents.es.indices.refresh(index=incidents.es_index)
         print("... refreshed index")
 
+    @staticmethod
+    def format_update(update, idx):
+        """Format an update for Slack"""
+        if 'author' in update:
+            author_str = " - <@" + update['author']['id'] + ">"
+        else:
+            author_str = ""
+        return "Update n°{number} ({date}{author}) - {message|".format(
+                    number = str(idx + 1),
+                    date = update['date'].strftime("%Y-%m-%d %H:%M:%S"),
+                    author = author_str,
+                    message = update['message']
+        )
+
     def serialize(self):
-        return json.dumps(self.__dict__, indent=4, cls=DumbEncoder, ensure_ascii=False)
+        return json.dumps(self.__dict__, indent=4,
+                          cls=DumbEncoder, ensure_ascii=False)
 
     def unserialize(self, source_json):
         log.debug("Unserializing incident from json ...")
@@ -134,9 +151,11 @@ class Incident(object):
         self.priority = IncidentPriority(self.priority)
         self.state = IncidentState(self.state)
         if self.state == IncidentState.CLOSED:
-            self.closing_time = datetime.strptime(self.closing_time, DATE_FORMAT)
+            self.closing_time = datetime.strptime(self.closing_time,
+                                                  DATE_FORMAT)
         for idx, update in enumerate(self.updates):
-            self.updates[idx]['date'] = datetime.strptime(update['date'], DATE_FORMAT)
+            self.updates[idx]['date'] = datetime.strptime(update['date'],
+                                                          DATE_FORMAT)
         # print(self.serialize())
         print("... unserialized")
         return self

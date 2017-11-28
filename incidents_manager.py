@@ -11,6 +11,7 @@ from log import log
 from config import config
 from incident import Incident, IncidentPriority
 
+
 class IncidentsManager(object):
     def __init__(self):
         log.info("Initializing incidents manager ...")
@@ -34,7 +35,8 @@ class IncidentsManager(object):
                 **boto_utils.get_credentials()
             )
             self.es = Elasticsearch(
-                hosts   = [{'host': config['elasticsearch']['host'], 'port': 443}],
+                hosts   = [{'host': config['elasticsearch']['host'],
+                            'port': 443}],
                 http_auth           = aws_auth,
                 use_ssl             = True,
                 verify_certs        = True,
@@ -83,7 +85,7 @@ class IncidentsManager(object):
         # TODO create Slack channel
         # TODO send incident to ES
         # TODO post incident to Slack main channel
-        # TODO post incident susmmary to Slack dedicated channel
+        # TODO post incident summary to Slack dedicated channel
         # TODO send email
         # TODO declare to Cachet
         log.info("Created incident successfully :)")
@@ -114,11 +116,8 @@ class IncidentsManager(object):
         source_message = event['text']
 
         # Get real infos from Slack API
-        # noinspection PyPep8
-        # source_channel = self.slack.channels.info(channel=source_channel_id).body['channel']
-        # source_user = self.slack.users.info(user=source_user_id).body['user']
-        source_channel = source_channel_id
-        source_user = source_user_id
+        source_channel = self.slack.channels.info(channel=source_channel_id).body['channel']
+        source_user = self.slack.users.info(user=source_user_id).body['user']
         return {
             'channel': source_channel,
             'user': source_user,
