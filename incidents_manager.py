@@ -3,6 +3,8 @@ from slacker import Slacker, Error
 
 from config import config
 
+# JIRA
+from jira import JIRA
 # ElasticSearch
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.aws_auth import AWSRequestsAuth
@@ -19,7 +21,7 @@ class IncidentsManager(object):
         self.slack_fake_user = Slacker(config['slack']['fake_user']['token'])
         self.apiai_user = self.slack_fake_user.users.info(
             user=config['slack']['apiai_user']['id']).body['user']
-        # SMTP
+        # TODO SMTP
         # Elasticsearch
         log.info("- Configuring Elasticsearch connection ...")
         self.es_index = config['elasticsearch']['index']
@@ -47,7 +49,14 @@ class IncidentsManager(object):
             self.create_es_index(self.es_index)
         except:
             log.error("Couldn't create Elasticsearch index")
-        # Cachet
+        # Jira
+        log.info("- Configuring Jira connection ...")
+        self.jira   = JIRA(
+            {'server': config['jira']['host']},
+            basic_auth=(config['jira']['user'], config['jira']['password'])
+        )
+        self.jira_project = config['jira']['project']
+        # TODO Cachet
         return
 
     def create_incident(self, priority, title, description):
@@ -58,17 +67,37 @@ class IncidentsManager(object):
             "  Description: {description}"
             "".format(priority=priority, title=title,
                       description=description))
+        jira_issue = self.jira.create_issue(
+            project = self.jira_project,
+            issuetype={'name': 'Task'},
+            summary  = title,
+            description = description)
+        incident_id = int(str(jira_issue)[len(self.jira_project)+1:])
+        log.debug("got incident id " + str(incident_id))
+        # TODO create Incident object
+        # TODO create Slack channel
+        # TODO send incident to ES
+        # TODO post incident to Slack main channel
+        # TODO post incident susmmary to Slack dedicated channel
+        # TODO send email
+        # TODO declare to Cachet
         log.info("Created incident successfully :)")
 
     def close_incident(self, event):
         log.info("Closing incident ...")
         source = self.extract_event_infos(event)
         log.info("Source: " + str(source))
+        # TODO find incident from channel
+        # TODO unserialize event
+        # TODO close incident for real
         log.info("Closed incident successfully :)")
 
     def list_incident_updates(self, event):
         log.info("Listing incident updates ...")
         source = self.extract_event_infos(event)
+        # TODO find incident from channel
+        # TODO unserialize event
+        # TODO list updates for real
         log.info("Source: " + str(source))
 
     def extract_event_infos(self, event):
@@ -95,9 +124,9 @@ class IncidentsManager(object):
         # === Wipe index
         # self.es.indices.delete(index=self.es_index)
         # === Create it again
-        print("Creating index " + es_index + " ...")
+        log.info("Creating index " + es_index + " ...")
         index_creation = self.es.indices.create(index=es_index, ignore=400)
         if 'acknowledged' in index_creation and index_creation['acknowledged']:
-            print("... Index created")
+            log.info("... Index created")
         elif 'status' in index_creation and index_creation['status'] == 400:
-            print("... Index already exists, continuing")
+            log.info("... Index already exists, continuing")
