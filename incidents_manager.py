@@ -1,5 +1,6 @@
 # Slack
 from slacker import Slacker
+from slacker import Error as SlackerError
 # JIRA
 from jira import JIRA
 # ElasticSearch
@@ -24,7 +25,7 @@ class IncidentsManager(object):
             user=config['slack']['apiai_user']['id']).body['user']
         # TODO SMTP
         # Elasticsearch
-        log.info("- Configuring Elasticsearch connection ...")
+        log.info("Connecting to Elasticsearch ...")
         self.es_index = config['elasticsearch']['index']
         try:
             # @formatter:off
@@ -50,7 +51,7 @@ class IncidentsManager(object):
         except:
             log.error("Couldn't create Elasticsearch index")
         # Jira
-        log.info("- Configuring Jira connection ...")
+        log.info("Connecting to Jira ...")
         self.jira = JIRA(
             {'server': config['jira']['host']},
             basic_auth=(config['jira']['user'], config['jira']['password'])
@@ -60,20 +61,12 @@ class IncidentsManager(object):
         return
 
     def create_incident(self, priority, title, description):
-        log.info(
-            "Starting to create incident ...:\n"
-            "  Priority: {priority}\n"
-            "  Title: {title}\n"
-            "  Description: {description}"
-            "".format(priority=priority, title=title,
-                      description=description))
-        # @formatter:off
+        log.info("Starting to create incident ...")
         jira_issue = self.jira.create_issue(
             project     = self.jira_project,
-            issuetype   = {'name': 'Task'},
+            issuetype   = {'name': 'Incident'},
             summary     = title,
             description = description)
-        # @formatter:on
         incident_id = int(str(jira_issue)[len(self.jira_project)+1:])
         log.debug("got incident id " + str(incident_id))
         incident = Incident(
@@ -81,10 +74,12 @@ class IncidentsManager(object):
             priority    = IncidentPriority(priority),
             title       = title,
             description = description)
-        log.debug(incident.serialize())
-        # TODO create Slack channel
-        # TODO send incident to ES
-        # TODO post incident to Slack main channel
+        incident.send_to_es()
+        # log.debug(incident.serialize())
+        self.create_slack_channel(incident)
+        # Resend it now that is has a Slack channel ID
+        incident.send_to_es()
+        self.post_new_incident_announce_on_slack(incident)
         # TODO post incident summary to Slack dedicated channel
         # TODO send email
         # TODO declare to Cachet
@@ -134,3 +129,139 @@ class IncidentsManager(object):
             log.info("... Index created")
         elif 'status' in index_creation and index_creation['status'] == 400:
             log.info("... Index already exists, continuing")
+
+    def invite_user_to_channel(self, user, user_id, channel, channel_id):
+        log.debug("Inviting user {user} to new Slack channel {channel} ..."
+                  .format(user=user, channel=channel))
+        try:
+            self.slack_fake_user.channels.invite(
+                channel = channel_id,
+                user = user_id
+            )
+        except SlackerError as e:
+            if str(e) == "already_in_channel":
+                log.debug("User {user} already in channel {channel} ; continuing ..."
+                          .format(user=user, channel=channel))
+                pass
+
+    # TODO : set channel topic and description
+    def create_slack_channel(self, incident):
+        # Create channel
+        log.info("Creating Slack channel " + incident.slack_channel + "...")
+        try:
+            channel = self.slack_fake_user.channels.create(
+                name=incident.slack_channel).body['channel']
+            log.debug("... created Slack channel with ID " + channel['id'])
+        except SlackerError as e:
+            if str(e) == "name_taken":
+                log.debug("... channel already exists, searching the existing one")
+                channels_list = self.slack.channels.list().body['channels']
+                channel = [chan for chan in channels_list if chan['name'] == incident.slack_channel]
+                if len(channel) != 1:
+                    raise Exception("Failed to lookup channel that should exist")
+                channel = channel[0]
+                log.debug("... existing channel found,  continuing using channel " + channel['id'])
+                pass
+            else:
+                raise e
+        incident.slack_channel_id = channel['id']
+
+        # Join channel
+        log.debug("Fake user joining channel ...")
+        self.slack_fake_user.channels.join(name=channel['name'])
+        log.debug("... joined channel")
+
+        # Invite Dialogflow user
+        log.debug("Inviting Dialogflow user to incident channel ...")
+        self.invite_user_to_channel(
+            user=self.apiai_user['name'],
+            user_id=self.apiai_user['id'],
+            channel=incident.slack_channel,
+            channel_id=incident.slack_channel_id
+        )
+        log.debug("Invited user")
+
+        # Invite App user
+        log.debug("Inviting self (app) user to incident channel ...")
+        self.invite_user_to_channel(
+            user=self.slack_self_user['name'],
+            user_id=self.slack_self_user['id'],
+            channel=incident.slack_channel,
+            channel_id=incident.slack_channel_id
+        )
+        log.debug("Invited user")
+
+        # Define purpose and title
+        log.debug("... defining channel purpose")
+        self.slack.channels.set_purpose(
+            channel = incident.slack_channel_id,
+            purpose = "Incident " + incident.priority.value.upper() + " " +
+                      str(incident.id) + " - Incident management room"
+        )
+        log.debug("... defined channel purpose")
+        log.debug("... defining channel title")
+        self.slack.channels.set_topic(
+            channel = incident.slack_channel_id,
+            topic = incident.title
+        )
+        log.debug("... defined channel title")
+
+    def post_new_incident_announce_on_slack(self, incident):
+        log.debug("Posting new incident announce ...")
+        self.slack.chat.post_message(
+            channel=self.slack_channel,
+            text='',
+            as_user=True,
+            attachments=[
+                {
+                    "text": ":warning: New incident opened: *" +
+                            incident.slack_channel + "* :warning:",
+                    "color": incident.get_color(),
+                    "mrkdwn_in": ["text"],
+                    "fields": [
+                        {"title": "Title", "value": str(incident.title), "short": False},
+                        {"title": "State", "value": incident.state.value, "short": True},
+                        {"title": "ID", "value": str(incident.id), "short": True},
+                        {"title": "Priority", "value": incident.priority.value, "short": True},
+                        {"title": "Jira Issue",
+                         "value": "<{jira_server}/browse/{jira_issue}|{jira_issue}>".format(
+                             jira_server=config['jira']['host'],
+                             jira_issue=incident.jira_issue),
+                         "short": True},
+                        {"title": "Description", "value": str(incident.description), "short": False}
+                    ]
+                },
+                {
+                    "text": "Please join channel <#" + incident.slack_channel_id + ">",
+                    "mrkdwn_in": ["text"],
+                    "color": incident.get_color()
+                }
+            ])
+        log.debug("Posted new incident announce")
+
+    def post_new_incident_summary(self, incident):
+        log.debug("Posting new incident summary ...")
+        self.slack.chat.post_message(
+            channel=incident.slack_channel,
+            text='',
+            as_user=True,
+            attachments=[
+                {
+                    "text": ":warning: Welcome to this new code handling channel\n" +
+                            "As a reminder, here are the informations so far:",
+                    "mrkdwn_in": ["text"],
+                    "fields": [
+                        {"title": "Title", "value": str(incident.title), "short": False},
+                        {"title": "State", "value": incident.state.value, "short": True},
+                        {"title": "ID", "value": str(incident.id), "short": True},
+                        {"title": "Priority", "value": incident.priority.value, "short": True},
+                        {"title": "Jira Issue",
+                         "value": "<{jira_server}/browse/{jira_issue}|{jira_issue}>".format(
+                             jira_server=config['jira']['host'],
+                             jira_issue=incident.jira_issue),
+                         "short": True},
+                        {"title": "Description", "value": str(incident.description), "short": False}
+                    ]
+                }
+            ])
+        log.debug("Posted new incident summary")

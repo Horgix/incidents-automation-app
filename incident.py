@@ -46,9 +46,6 @@ class Incident(object):
         self.updates        = []
         self.jira_issue     = config['jira']['project'] + "-" + str(self.id)
         self.cachet_id      = None
-        if incident_id != 0:
-            log.debug("Sending incident to ES...")
-            self.send_to_es()
         print("... created incident")
 
     def close(self):
@@ -112,7 +109,7 @@ class Incident(object):
     def send_to_es(self):
         """Send incident to ElasticSearch"""
         from app import incidents
-        print("Sending incident to ES ...")
+        log.debug("Sending incident to ES ...")
         incidents.es.index(
             index = incidents.es_index,
             doc_type="incident",
@@ -160,3 +157,5 @@ class Incident(object):
         print("... unserialized")
         return self
 
+    # TODO : declare_to_cachet
+    # TODO : add_update
