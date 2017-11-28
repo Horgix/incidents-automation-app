@@ -70,9 +70,9 @@ def webhook():
             priority=parameters['color'],
             title=parameters['title'],
             description=parameters['description'])
-    if intent == "incident.close":
+    elif intent == "incident.close":
         incidents.close_incident(event)
-    if intent == "incident.list_updates":
+    elif intent == "incident.list_updates":
         incidents.list_incident_updates(event)
     else:
         log.warning("Couldn't dispatch intent {intent} to anything "
