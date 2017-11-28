@@ -67,7 +67,7 @@ def webhook():
     log.info("Dispatching based on intent")
     if intent == "incident.create":
         incidents.create_incident(
-            priority=parameters['priority'],
+            priority=parameters['color'],
             title=parameters['title'],
             description=parameters['description'])
     if intent == "incident.close":
