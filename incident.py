@@ -36,7 +36,7 @@ class Incident(object):
         self.id             = incident_id
         self.title          = title
         self.description    = description
-        self.priority       = priority
+        self.priority       = IncidentPriority(priority)
         self.slack_channel  = "incident-" + str(self.id)
         self.slack_channel_id  = None
         self.opening_time   = datetime.now()
@@ -46,7 +46,7 @@ class Incident(object):
         self.updates        = []
         self.jira_issue     = config['jira']['project'] + "-" + str(self.id)
         self.cachet_id      = None
-        print("... created incident")
+        print("Created incident")
 
     def close(self):
         from app import incidents
@@ -54,10 +54,8 @@ class Incident(object):
         self.state          = IncidentState.CLOSED
         self.closing_time   = datetime.now()
         self.ending_time    = self.closing_time
-        log.debug("... updated ES record")
         self.send_to_es()
-        log.debug("... updated ES record")
-        log.debug("... sending confirmation to Slack")
+        log.debug("Sending confirmation to Slack ...")
         incidents.slack.chat.post_message(
             channel = self.slack_channel,
             text    = '',
@@ -86,18 +84,67 @@ class Incident(object):
                 }
             ]
         )
-        log.debug("... sent confirmation")
-        # TODO self.list_updates()
-        log.debug("... updating Jira issue")
+        log.debug("Sent confirmation to Slack")
+        self.list_updates()
+        log.debug("Updating Jira issue ...")
         try:
-            # TODO update to proper transition ID
-            incidents.jira.transition_issue(self.jira_issue, "21")
+            incidents.jira.transition_issue(self.jira_issue, "1002")
         except JIRAError:
             pass
-        log.debug("... updated issue")
-        log.debug("... updating Cachet")
-        # TODO self.declare_to_cachet()
-        log.debug("... updated Cachet")
+        log.debug("Updated Jira issue")
+        log.debug("Updating Cachet ...")
+        # FIXME self.declare_to_cachet()
+        log.debug("Updated Cachet")
+
+    def set_description(self, new_description):
+        log.debug("Updating description for incident " + str(self.id) + " ... ")
+        from app import incidents
+        self.description = new_description
+        self.send_to_es()
+        log.debug("Updated description")
+        log.debug("Sending confirmation to Slack ...")
+        incidents.slack.channels.set_purpose(
+            channel = self.slack_channel_id,
+            purpose = "Incident " + self.priority.value.upper() + " " +
+                      str(self.id) + " - Incident management room\n\n" +
+                      new_description
+        )
+        print("Sent confirmation to Slack")
+
+    def add_update(self, message, user):
+        log.info("Adding update ...")
+        from app import incidents
+        date = datetime.now()
+        self.updates.append({'message': message, 'author': user, 'date': date})
+        log.debug("Ack Slack")
+        incidents.slack.chat.post_message(
+            channel = self.slack_channel,
+            text    = '',
+            as_user = True,
+            attachments = [
+                {
+                    "text": "Just logged a new update for this incident." +
+                            " The message was: " + message,
+                    "mrkdwn_in": ["text"]
+                }
+            ]
+        )
+        self.send_to_es()
+        log.debug("Adding comment to Jira")
+        incidents.jira.add_comment(self.jira_issue, message)
+
+    def list_updates(self):
+        print("Listing updates for incident " + str(self.id) + " ... ")
+        from app import incidents
+        incidents.slack.chat.post_message(
+            channel = self.slack_channel,
+            text    = 'Here are the updates for this incident:\n```' +
+                      '\n'.join([
+                                    self.format_update(update, idx)
+                                    for idx, update in enumerate(self.updates)]) + '```',
+            as_user = True
+        )
+        print("Sent updates to Slack")
 
     def get_color(self):
         """Get color code from incident priority"""
@@ -116,10 +163,10 @@ class Incident(object):
             id = self.id,
             body = self.serialize()
         )
-        print("... sent incident to ES")
+        print("Sent incident to ES")
         print("Refreshing ES index ...")
         incidents.es.indices.refresh(index=incidents.es_index)
-        print("... refreshed index")
+        print("Refreshed index")
 
     @staticmethod
     def format_update(update, idx):
@@ -156,6 +203,3 @@ class Incident(object):
         # print(self.serialize())
         print("... unserialized")
         return self
-
-    # TODO : declare_to_cachet
-    # TODO : add_update

@@ -35,9 +35,7 @@ def unprocessable_entity(error):
 
 @app.route('/')
 def index():
-    """
-    Simple debugging endpoint
-    """
+    """Simple debugging endpoint"""
     return "Hello, I'm incidents bot!"
 
 
@@ -61,10 +59,12 @@ def webhook():
         return jsonify({"status": "failed"})
 
     # Dispatching based on parsed intent
-    log.info("Extracting parameters and event informations")
+    log.debug("Extracting parameters and event informations ...")
     parameters = req['queryResult']['parameters']
     event = req['originalDetectIntentRequest']['payload']['data']['event']
-    log.info("Dispatching based on intent")
+    log.debug("Extracted parameters and event informations")
+    log.info("Dispatching based on intent ...")
+
     if intent == "incident.create":
         incidents.create_incident(
             priority=parameters['color'],
@@ -72,8 +72,12 @@ def webhook():
             description=parameters['description'])
     elif intent == "incident.close":
         incidents.close_incident(event)
+    elif intent == "incident.update":
+        incidents.log_update(parameters, event)
     elif intent == "incident.list_updates":
         incidents.list_incident_updates(event)
+    elif intent == "incident.set_description":
+        incidents.set_incident_description(parameters, event)
     else:
         log.warning("Couldn't dispatch intent {intent} to anything "
                     "known".format(intent=intent))

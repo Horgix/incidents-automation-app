@@ -10,7 +10,7 @@ from aws_requests_auth import boto_utils
 
 from log import log
 from config import config
-from incident import Incident, IncidentPriority
+from incident import Incident
 
 
 class IncidentsManager(object):
@@ -23,7 +23,7 @@ class IncidentsManager(object):
         self.slack_fake_user = Slacker(config['slack']['fake_user']['token'])
         self.apiai_user = self.slack_fake_user.users.info(
             user=config['slack']['apiai_user']['id']).body['user']
-        # TODO SMTP
+        # FIXME SMTP
         # Elasticsearch
         log.info("Connecting to Elasticsearch ...")
         self.es_index = config['elasticsearch']['index']
@@ -57,21 +57,28 @@ class IncidentsManager(object):
             basic_auth=(config['jira']['user'], config['jira']['password'])
         )
         self.jira_project = config['jira']['project']
-        # TODO Cachet
+        # FIXME Cachet
         return
 
     def create_incident(self, priority, title, description):
         log.info("Starting to create incident ...")
+        log.info("Declaring incident to Jira ...")
+        if not priority:
+            priority = "red"
+        if not title:
+            title = "Undefined"
+        if not description:
+            description = "Undefined"
         jira_issue = self.jira.create_issue(
             project     = self.jira_project,
             issuetype   = {'name': 'Incident'},
             summary     = title,
             description = description)
         incident_id = int(str(jira_issue)[len(self.jira_project)+1:])
-        log.debug("got incident id " + str(incident_id))
+        log.debug("Got incident id " + str(incident_id) + " from Jira")
         incident = Incident(
             incident_id,
-            priority    = IncidentPriority(priority),
+            priority    = priority,
             title       = title,
             description = description)
         incident.send_to_es()
@@ -80,32 +87,48 @@ class IncidentsManager(object):
         # Resend it now that is has a Slack channel ID
         incident.send_to_es()
         self.post_new_incident_announce_on_slack(incident)
-        # TODO post incident summary to Slack dedicated channel
-        # TODO send email
-        # TODO declare to Cachet
+        self.post_new_incident_summary(incident)
+        # FIXME send email
+        # FIXME declare to Cachet
         log.info("Created incident successfully :)")
 
     def close_incident(self, event):
         log.info("Closing incident ...")
         source = self.extract_event_infos(event)
-        log.info("Source: " + str(source))
-        # TODO find incident from channel
-        # TODO unserialize event
-        # TODO close incident for real
+        # log.debug("Source: " + str(source))
+        incident_json = self.find_incident_from_channel(source['channel']['id'])
+        incident = Incident().unserialize(incident_json)
+        incident.close()
         log.info("Closed incident successfully :)")
 
     def list_incident_updates(self, event):
         log.info("Listing incident updates ...")
         source = self.extract_event_infos(event)
-        # TODO find incident from channel
-        # TODO unserialize event
-        # TODO list updates for real
-        log.info("Source: " + str(source))
+        incident_json = self.find_incident_from_channel(source['channel']['id'])
+        incident = Incident().unserialize(incident_json)
+        incident.list_updates()
+        log.info("Listed incident updates with success")
+
+    def set_incident_description(self, parameters, event):
+        log.info("Setting incident description ...")
+        source = self.extract_event_infos(event)
+        incident_json = self.find_incident_from_channel(source['channel']['id'])
+        incident = Incident().unserialize(incident_json)
+        incident.set_description(parameters['description'])
+        log.info("Set incident description with success")
+
+    def log_update(self, parameters, event):
+        log.info("Logging new update ...")
+        source = self.extract_event_infos(event)
+        log.debug("--- Channel: " + str(source['channel']['name']))
+        log.debug("--- User: " + str(source['user']['name']))
+        incident_json = self.find_incident_from_channel(source['channel']['id'])
+        incident = Incident().unserialize(incident_json)
+        incident.add_update(parameters['update_desc'], source['user'])
+        log.info("Logged new update with success")
 
     def extract_event_infos(self, event):
-        """
-        Extract Slack event core infos (channel, user, message) from event
-        """
+        """Extract Slack event core infos (channel, user, message) from event"""
         source_channel_id = event['channel']
         source_user_id = event['user']
         source_message = event['text']
@@ -265,3 +288,20 @@ class IncidentsManager(object):
                 }
             ])
         log.debug("Posted new incident summary")
+
+    def find_incident_from_channel(self, channel_id):
+        log.debug("Searching incident from channel ID " + channel_id + " ...")
+        res = self.es.search(
+            index = self.es_index,
+            doc_type = "incident",
+            q = "slack_channel_id:" + channel_id
+        )
+        if res['hits']['total'] == 0:
+            log.warning("... could not found any corresponding incident, sorry, aborting")
+            return
+        if res['hits']['total'] != 1:
+            log.warning("... found multiple (" + str(res['hits']) +
+                        ") channels which shouldn't happen, aborting")
+            return
+        incident_json = res['hits']['hits'][0]['_source']
+        return incident_json
