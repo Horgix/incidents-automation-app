@@ -110,3 +110,44 @@ Now from Slack
     "session": "projects/incidents-9359b/agent/sessions/a488a01b-46b7-4db5-a703-f3bb2ef062ff"
 }
 ```
+
+
+# Configuration
+
+`config.json` :
+
+```
+{
+  "slack": {
+    "channel": "#incidents",
+    "self": {
+      "token": "xoxb-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "id": "ABCD12345",
+      "name": "incidents-bot"
+    },
+    "fake_user": {
+      "email": "hello@example.org",
+      "password": "ultrasecurepassword",
+      "token": "xoxp-111111111111-222222222222-333333333333-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "apiai_user": {
+      "id": "XYZ987654"
+    }
+  },
+  "elasticsearch": {
+    "index": "incidents",
+    "host": "my-es-cluster.eu-west-1.es.amazonaws.com",
+    "region": "eu-west-1"
+  },
+  "jira": {
+    "host": "https://jira.example.org",
+    "user": "incidents-bot",
+    "password": "anotherultrasecurepassword",
+    "project": "INCIDENTS"
+  },
+  "cachet": {
+    "host": "http://status.example.org/api/v1",
+    "token": "xxxxxxxxxxxxxxxxxxxx"
+  }
+}
+```
