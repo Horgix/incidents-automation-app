@@ -136,12 +136,16 @@ class Incident(object):
     def list_updates(self):
         print("Listing updates for incident " + str(self.id) + " ... ")
         from app import incidents
+        if len(self.updates) == 0:
+            message = "No updates were logged for this incident."
+        else:
+            message = "Here are the updates for this incident:\n```" +\
+                      "\n".join([
+                      self.format_update(update, idx)
+                      for idx, update in enumerate(self.updates)]) + "```",
         incidents.slack.chat.post_message(
             channel = self.slack_channel,
-            text    = 'Here are the updates for this incident:\n```' +
-                      '\n'.join([
-                                    self.format_update(update, idx)
-                                    for idx, update in enumerate(self.updates)]) + '```',
+            text    = message,
             as_user = True
         )
         print("Sent updates to Slack")
@@ -175,7 +179,7 @@ class Incident(object):
             author_str = " - <@" + update['author']['id'] + ">"
         else:
             author_str = ""
-        return "Update n°{number} ({date}{author}) - {message|".format(
+        return "Update n°{number} ({date}{author}) - {message}".format(
                     number = str(idx + 1),
                     date = update['date'].strftime("%Y-%m-%d %H:%M:%S"),
                     author = author_str,
