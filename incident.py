@@ -93,7 +93,7 @@ class Incident(object):
             pass
         log.debug("Updated Jira issue")
         log.debug("Updating Cachet ...")
-        # FIXME self.declare_to_cachet()
+        self.declare_to_cachet()
         log.debug("Updated Cachet")
 
     def set_description(self, new_description):
@@ -171,6 +171,23 @@ class Incident(object):
         print("Refreshing ES index ...")
         incidents.es.indices.refresh(index=incidents.es_index)
         print("Refreshed index")
+
+    def declare_to_cachet(self):
+        from app import incidents
+        log.info("Declaring incident to Cachet ...")
+        if self.state == IncidentState.CLOSED:
+            status = 4
+            component_status = 1
+        else:
+            status = 1
+            component_status = 4
+        new_cachet_incident = json.loads(incidents.cachet_client.post(
+            name=self.title,
+            message=self.description,
+            status=status,
+            component_id='1',
+            component_status=component_status))
+        self.cachet_id = new_cachet_incident['data']['id']
 
     @staticmethod
     def format_update(update, idx):

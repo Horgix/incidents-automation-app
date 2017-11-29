@@ -7,6 +7,8 @@ from jira import JIRA
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from aws_requests_auth.aws_auth import AWSRequestsAuth
 from aws_requests_auth import boto_utils
+# Cachet
+import cachetclient.cachet as cachet
 
 from log import log
 from config import config
@@ -57,7 +59,9 @@ class IncidentsManager(object):
             basic_auth=(config['jira']['user'], config['jira']['password'])
         )
         self.jira_project = config['jira']['project']
-        # FIXME Cachet
+        log.debug("Connecting to Cachet ...")
+        self.cachet_client = cachet.Incidents(endpoint=config['cachet']['host'],
+                                              api_token=config['cachet']['token'])
         return
 
     def create_incident(self, priority, title, description):
@@ -89,7 +93,7 @@ class IncidentsManager(object):
         self.post_new_incident_announce_on_slack(incident)
         self.post_new_incident_summary(incident)
         # FIXME send email
-        # FIXME declare to Cachet
+        incident.declare_to_cachet()
         log.info("Created incident successfully :)")
 
     def close_incident(self, event):
