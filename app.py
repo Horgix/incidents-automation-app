@@ -63,8 +63,13 @@ def webhook():
     parameters = req['queryResult']['parameters']
     event = req['originalDetectIntentRequest']['payload']['data']['event']
     log.debug("Extracted parameters and event informations")
-    log.info("Dispatching based on intent ...")
 
+    # Avoid infinite looping on our own messages
+    if event["user"] == incidents.slack_self_user['id']:
+        log.info("Skipping intent, sent by the bot itself")
+        return jsonify({"status": "success"})
+
+    log.info("Dispatching based on intent ...")
     if intent == "incident.create":
         incidents.create_incident(
             priority=parameters['color'],
