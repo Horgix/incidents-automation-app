@@ -1,0 +1,50 @@
+{
+    "responseId": "6764a952-71a0-4553-b98f-447cca749100",
+    "queryResult": {
+        "queryText": "Could you close this incident?",
+        "parameters": {},
+        "allRequiredParamsPresent": true,
+        "fulfillmentMessages": [
+            {
+                "text": {
+                    "text": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "intent": {
+            "name": "projects/incidents-9359b/agent/intents/31116de1-8f26-4a29-9561-f5d18ffa2210",
+            "displayName": "incident.close"
+        },
+        "intentDetectionConfidence": 0.91,
+        "diagnosticInfo": {},
+        "languageCode": "en"
+    },
+    "originalDetectIntentRequest": {
+        "payload": {
+            "data": {
+                "authed_users": [
+                    "U84T2CA6R"
+                ],
+                "event_id": "Ev85MM1YEP",
+                "api_app_id": "A85BF397D",
+                "team_id": "T84NUNW2W",
+                "event": {
+                    "event_ts": "1511778763.000160",
+                    "channel": "D869XNK7Y",
+                    "text": "Could you close this incident?",
+                    "type": "message",
+                    "user": "U84T2CA6R",
+                    "ts": "1511778763.000160"
+                },
+                "type": "event_callback",
+                "event_time": 1511778763.0,
+                "token": "q4GmpdQPQSUT9TlJhSiDrwhU"
+            },
+            "source": "slack"
+        }
+    },
+    "session": "projects/incidents-9359b/agent/sessions/4fdea8f3-72b8-4b0f-9f2f-c44b8f60f872"
+}
+

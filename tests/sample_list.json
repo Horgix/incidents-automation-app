@@ -1,0 +1,49 @@
+{
+    "responseId": "2740662d-f3f2-4880-9f5b-1a0459544d82",
+    "queryResult": {
+        "queryText": "What are the updates so far?",
+        "parameters": {},
+        "allRequiredParamsPresent": true,
+        "fulfillmentMessages": [
+            {
+                "text": {
+                    "text": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "intent": {
+            "name": "projects/incidents-9359b/agent/intents/7e726b18-fcf9-4497-ab44-6180777bbab7",
+            "displayName": "incident.list_updates"
+        },
+        "intentDetectionConfidence": 1.0,
+        "diagnosticInfo": {},
+        "languageCode": "en"
+    },
+    "originalDetectIntentRequest": {
+        "payload": {
+            "data": {
+                "authed_users": [
+                    "U84T2CA6R"
+                ],
+                "event_id": "Ev85PWGMD1",
+                "api_app_id": "A85BF397D",
+                "team_id": "T84NUNW2W",
+                "event": {
+                    "event_ts": "1511790259.000209",
+                    "channel": "D869XNK7Y",
+                    "text": "What are the updates so far?",
+                    "type": "message",
+                    "user": "U84T2CA6R",
+                    "ts": "1511790259.000209"
+                },
+                "type": "event_callback",
+                "event_time": 1511790259.0,
+                "token": "q4GmpdQPQSUT9TlJhSiDrwhU"
+            },
+            "source": "slack"
+        }
+    },
+    "session": "projects/incidents-9359b/agent/sessions/97da20c9-6a16-4a77-bc6c-245ec24a5e3c"
+}

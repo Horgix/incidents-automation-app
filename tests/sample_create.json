@@ -1,0 +1,54 @@
+{
+    "responseId": "7a261c82-90d5-416f-b238-56316949f9db",
+    "queryResult": {
+        "queryText": "Create red code called \"Hello world\"aa",
+        "parameters": {
+            "color": "red",
+            "description": "aa",
+            "title": "Hello world"
+        },
+        "allRequiredParamsPresent": true,
+        "fulfillmentMessages": [
+            {
+                "text": {
+                    "text": [
+                        ""
+                    ]
+                }
+            }
+        ],
+        "intent": {
+            "name": "projects/incidents-9359b/agent/intents/2763fa11-af72-466e-9ea1-fc575da10a13",
+            "displayName": "incident.create"
+        },
+        "intentDetectionConfidence": 0.91,
+        "diagnosticInfo": {},
+        "languageCode": "en"
+    },
+    "originalDetectIntentRequest": {
+        "payload": {
+            "data": {
+                "authed_users": [
+                    "U84T2CA6R"
+                ],
+                "event_id": "Ev84V2RHPA",
+                "api_app_id": "A85BF397D",
+                "team_id": "T84NUNW2W",
+                "event": {
+                    "event_ts": "1511735362.000056",
+                    "channel": "D869XNK7Y",
+                    "text": "Create red code called \"Hello world\"aa",
+                    "type": "message",
+                    "user": "U84T2CA6R",
+                    "ts": "1511735362.000056"
+                },
+                "type": "event_callback",
+                "event_time": 1511735362.0,
+                "token": "q4GmpdQPQSUT9TlJhSiDrwhU"
+            },
+            "source": "slack"
+        }
+    },
+    "session": "projects/incidents-9359b/agent/sessions/6c666fbb-da64-498d-b7b7-091e5a437bca"
+}
+
