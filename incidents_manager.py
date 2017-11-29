@@ -124,7 +124,7 @@ class IncidentsManager(object):
         log.debug("--- User: " + str(source['user']['name']))
         incident_json = self.find_incident_from_channel(source['channel']['id'])
         incident = Incident().unserialize(incident_json)
-        incident.add_update(parameters['update_desc'], source['user'])
+        incident.add_update(parameters['description'], source['user'])
         log.info("Logged new update with success")
 
     def extract_event_infos(self, event):
