@@ -88,7 +88,7 @@ class Incident(object):
         self.list_updates()
         log.debug("Updating Jira issue ...")
         try:
-            incidents.jira.transition_issue(self.jira_issue, "1002")
+            incidents.jira.transition_issue(self.jira_issue, "41")
         except JIRAError:
             pass
         log.debug("Updated Jira issue")
